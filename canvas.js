@@ -8,14 +8,18 @@
         [x] -  Add scoring
         [x] - Add collisions on walls and snake
         [x] - Difficulties
-        [ ] - Fix apple positions and create them as instances.
-        [ ] - Game over and reset
-        [ ] - Random snake start
-        [ ] - Standardize the size of the canvas (edges aren't a full gridSize)
+        [x] - Fix apple positions and create them as instances.
+        [x] - Multiple apple support
+        [ ] - Refactor the snake and canvas object to their own classes
         [ ] - Abstract out as classes
-        [ ] - Multiple apple support
+        [ ] - Standardize the size of the canvas (edges aren't a full gridSize)
+        [ ] - Apples spawn off canvas because of above
+        [ ] - Random snake start
+        [ ] - End a crash before going off stage (check ahead a grid space)
+        [ ] - Game over and reset
         [ ] - Themes
         [ ] - Munch sound 🙂 https://freesound.org/people/PapercutterJohn/sounds/318608/
+        [ ] - Adjust canvas size on reload with the event
     
     BUG:
         [ ] - Some weirdness when turning. Snake head turns after already moving an additional block forward.
@@ -26,10 +30,15 @@
 var tick = 0;
 var score = 0;
 var best = 0;
-var gridOn = false;
+var gridOn = true;
 var pause = false;
 var moving = false;
 var keyDown = false;
+
+// FPS data
+var curSecond = 0,
+    frameCount = 0,
+    framesLastSecond = 0;
 
 const difficulties = {
     easy: {
@@ -48,6 +57,8 @@ const difficulties = {
 var difficulty = "easy";
 var skipFrames = difficulties[difficulty].skipFrames;
 
+// TODO: Refactor as a class
+// This is the snake and the canvas. No no!
 var c = {
     canvas: null,
     ctx: null,
@@ -62,9 +73,10 @@ var c = {
             x: 6,
             y: 5
         }
-        // { x: 4, y: 5 }
     ]
 };
+
+var apples = [];
 
 class Apples {
     constructor(x, y) {
@@ -72,39 +84,55 @@ class Apples {
         this.y = y;
     }
 
-    munchApples(snake) {
-        // Randomly move the apple eaten.
-        if (snake.x === this.x && snake.y === this.y) {
-            this.x = Math.floor((Math.random() * c.width) / c.gridSize) - 5;
-            this.y = Math.floor((Math.random() * c.height) / c.gridSize) - 5;
-            return true;
+    // Removes the munched apple from the apples array.
+    static munchApples(snake) {
+        for (var i = 0; i < apples.length; i++) {
+            if (snake.x === apples[i].x && snake.y === apples[i].y) {
+                console.log("munch");
+                for (var i = 0; i < apples.length; i++) {
+                    if (snake.x === apples[i].x && snake.y === apples[i].y) {
+                        apples.splice(i, 1);
+                        this.spawnApples();
+                    }
+                }
+                return true;
+            }
         }
     }
-    spawnApple() {
-        c.ctx.fillStyle = "red";
-        c.ctx.strokeStyle = "black";
-        c.ctx.beginPath();
-        c.ctx.arc(
-            this.x * c.gridSize + c.gridSize / 2,
-            this.y * c.gridSize + c.gridSize / 2,
-            c.gridSize / 4,
-            0,
-            Math.PI * 2,
-            false
-        );
-        c.ctx.fill();
-        c.ctx.stroke();
-        c.ctx.fillStyle = "black";
-        let rectSize = c.gridSize / 10;
-        c.ctx.fillRect(
-            this.x * c.gridSize + c.gridSize / 2 - rectSize / 2,
-            this.y * c.gridSize + rectSize,
-            rectSize,
-            rectSize * 1.5
-        );
+    // Loops through the apples array and renders them to the canvas.
+    static renderApples() {
+        for (var i = 0; i < apples.length; i++) {
+            c.ctx.fillStyle = "red";
+            c.ctx.strokeStyle = "black";
+            c.ctx.beginPath();
+            c.ctx.arc(
+                apples[i].x * c.gridSize + c.gridSize / 2,
+                apples[i].y * c.gridSize + c.gridSize / 2,
+                c.gridSize / 4,
+                0,
+                Math.PI * 2,
+                false
+            );
+            c.ctx.fill();
+            c.ctx.stroke();
+            c.ctx.fillStyle = "black";
+            let rectSize = c.gridSize / 10;
+            c.ctx.fillRect(
+                apples[i].x * c.gridSize + c.gridSize / 2 - rectSize / 2,
+                apples[i].y * c.gridSize + rectSize,
+                rectSize,
+                rectSize * 1.5
+            );
+        }
+    }
+    // Creates a new apple into the apples array
+    static spawnApples() {
+        let x = Math.floor((Math.random() * c.width) / c.gridSize);
+        let y = Math.floor((Math.random() * c.height) / c.gridSize);
+        let apple = new Apples(x, y);
+        apples.push(apple);
     }
 }
-var apple = new Apples(5, 5);
 
 function drawLine(ctx, x, y, x2, y2) {
     ctx.beginPath();
@@ -175,13 +203,13 @@ function changeDir(key) {
 
 window.onload = function() {
     c.canvas = document.getElementById("snakeCanvas");
-    c.width = c.canvas.width = window.innerWidth - 2;
-    c.height = c.canvas.height = window.innerHeight - 2;
+    c.width = c.canvas.width = window.innerWidth / 1.25;
+    c.height = c.canvas.height = window.innerHeight / 1.25;
     c.ctx = c.canvas.getContext("2d");
 
     c.canvas.addEventListener("keydown", e => {
         if (e.key == " ") {
-            randomApple();
+            Apples.spawnApples();
         }
     });
     c.canvas.addEventListener("keydown", e => {
@@ -190,13 +218,13 @@ window.onload = function() {
     c.canvas.addEventListener("keyup", e => {
         keyDown = false;
     });
-
+    var apple = new Apples(7, 14);
+    apples.push(apple);
     animate();
 };
 
 function moveSnake() {
     moving = true;
-    console.log(c.direction);
 
     let curPos = [c.body[0].x, c.body[0].y];
     let newPart = {
@@ -228,24 +256,34 @@ function moveSnake() {
         };
     }
 
-    if (apple.munchApples(c.body[0]) === true) {
+    if (Apples.munchApples(c.body[0]) === true) {
         score++;
         c.body.push(newPart);
+        // apple = null;
+        c.ctx.fillStyle = "black";
+        for (let i = 0; i < c.body.length; i++) {
+            c.ctx.fillRect(
+                c.body[i].x * c.gridSize,
+                c.body[i].y * c.gridSize,
+                c.gridSize,
+                c.gridSize
+            );
+        }
     } else {
         c.body.unshift(newPart);
         c.body.pop();
         detectCollisions(newPart);
+        c.ctx.fillStyle = "black";
+        for (let i = 0; i < c.body.length; i++) {
+            c.ctx.fillRect(
+                c.body[i].x * c.gridSize,
+                c.body[i].y * c.gridSize,
+                c.gridSize,
+                c.gridSize
+            );
+        }
     }
 
-    c.ctx.fillStyle = "black";
-    for (let i = 0; i < c.body.length; i++) {
-        c.ctx.fillRect(
-            c.body[i].x * c.gridSize,
-            c.body[i].y * c.gridSize,
-            c.gridSize,
-            c.gridSize
-        );
-    }
     moving = false;
 }
 
@@ -268,7 +306,7 @@ function animate() {
 
     gridOn === true ? setUpGrid() : null;
 
-    apple.spawnApple();
+    Apples.renderApples();
 
     // console.log(c.direction);
     // switch (c.direction) {
@@ -288,6 +326,9 @@ function animate() {
 
     moveSnake();
     updateScore(score);
+    fpsCounter();
+
+    // FPS
 }
 
 function detectCollisions(snake) {
@@ -311,15 +352,10 @@ function detectCollisions(snake) {
     }
 }
 
-function randomApple() {
-    apple.x = Math.floor((Math.random() * c.width) / c.gridSize) - 5;
-    apple.y = Math.floor((Math.random() * c.height) / c.gridSize) - 5;
-}
-
 function updateScore(score = 0) {
     c.ctx.font = "24px Courier";
     c.ctx.fillStyle = "blue";
-    c.ctx.fillText(`Score: ${score}`, 15, 30);
+    c.ctx.fillText(`Score: ${score}`, 5, 20);
 }
 
 function restart() {
@@ -331,36 +367,17 @@ function restart() {
     animate();
 }
 
-// From throttle.js
-
-var delayedTimer = null;
-var throttled = [];
-var throttle = function(time, scope, callback, args, delayed = null) {
-    window.clearTimeout(delayedTimer);
-    console.log(delayedTimer);
-    if (throttled.length >= 1) {
-        for (var i = 0; i <= throttle.length; i++) {
-            if (throttled[i] === scope) {
-                console.log("Throttling!");
-                if (delayed == true) {
-                    console.log("delayed");
-                    delayedTimer = setTimeout(function() {
-                        callback(args);
-                        console.log("called!");
-                    }, time);
-                }
-                return false;
-            }
-        }
+function fpsCounter() {
+    var sec = Math.floor(Date.now() / 1000);
+    if (sec != curSecond) {
+        curSecond = sec;
+        framesLastSecond = frameCount;
+        frameCount = 1;
+    } else {
+        frameCount++;
     }
-
-    throttled.push(scope);
-    var timer = setTimeout(function() {
-        throttled.splice(throttled.indexOf(scope, 1));
-    }, time);
-    if (typeof callback === "function") {
-        callback(args);
-        return true;
-    }
-    return null;
-};
+    c.ctx.font = "24px Courier";
+    c.ctx.fillStyle = "blue";
+    let dynamicX = framesLastSecond >= 10 ? 30 : 20;
+    c.ctx.fillText(`${framesLastSecond}`, c.width - dynamicX, 20);
+}
