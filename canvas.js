@@ -5,25 +5,24 @@
 
     TODO:
 
-        [x] -  Add scoring
+        [x] - Add scoring
         [x] - Add collisions on walls and snake
         [x] - Difficulties
         [x] - Fix apple positions and create them as instances.
         [x] - Multiple apple support
         [ ] - Refactor the snake and canvas object to their own classes
         [ ] - Abstract out as classes
-        [ ] - Standardize the size of the canvas (edges aren't a full gridSize)
-        [ ] - Apples spawn off canvas because of above
+        [x] - Standardize the size of the canvas (edges aren't a full gridSize)
+        [x] - Apples spawn off canvas because of above
         [ ] - Random snake start
-        [ ] - End a crash before going off stage (check ahead a grid space)
+        [ ] - End a crash before going off stage (check ahead a grid space, if snake is only 1 cell, it looks like it goes off the screen)
         [ ] - Game over and reset
         [ ] - Themes
         [ ] - Munch sound 🙂 https://freesound.org/people/PapercutterJohn/sounds/318608/
-        [ ] - Adjust canvas size on reload with the event
+        [ ] - Adjust canvas size on resize
     
     BUG:
         [ ] - Some weirdness when turning. Snake head turns after already moving an additional block forward.
-        [ ] - Throttle (didn't work) the input to skipFrames? (ie. use throttle.js to disallow spamming causing the snake to double back.)
 
 */
 
@@ -203,8 +202,14 @@ function changeDir(key) {
 
 window.onload = function() {
     c.canvas = document.getElementById("snakeCanvas");
-    c.width = c.canvas.width = window.innerWidth / 1.25;
-    c.height = c.canvas.height = window.innerHeight / 1.25;
+    // Make sure the canvas is sized in full grid sizes.
+    let maxWidth = Math.floor(window.innerWidth / 1.25);
+    let cellsW = Math.floor(maxWidth / this.c.gridSize);
+    let maxHeight = Math.floor(window.innerHeight / 1.25);
+    let cellsH = Math.floor(maxHeight / this.c.gridSize);
+    c.width = c.canvas.width = cellsW * this.c.gridSize;
+    c.height = c.canvas.height = cellsH * this.c.gridSize;
+
     c.ctx = c.canvas.getContext("2d");
 
     c.canvas.addEventListener("keydown", e => {
@@ -308,27 +313,9 @@ function animate() {
 
     Apples.renderApples();
 
-    // console.log(c.direction);
-    // switch (c.direction) {
-    //     case "right":
-    //         c.body[0].x += 1;
-    //         break;
-    //     case "left":
-    //         c.body[0].x -= 1;
-    //         break;
-    //     case "down":
-    //         c.body[0].y += 1;
-    //         break;
-    //     case "up":
-    //         c.body[0].y -= 1;
-    //         break;
-    // }
-
     moveSnake();
     updateScore(score);
-    fpsCounter();
-
-    // FPS
+    // fpsCounter();
 }
 
 function detectCollisions(snake) {
@@ -360,13 +347,16 @@ function updateScore(score = 0) {
 
 function restart() {
     console.log("Restarting game.");
-    c.direction = "";
-    c.body[0].x = 5;
-    c.body[0].y = 5;
-    cancelAnimationFrame(frames);
-    animate();
+    window.location.reload();
+    // TODO: (maybe) Reload aspects of the game instead of entire page. This is causing the second game to go at 2x speed.
+    // c.direction = "";
+    // c.body[0].x = 5;
+    // c.body[0].y = 5;
+    // cancelAnimationFrame(frames);
+    // animate();
 }
 
+// Doesn't really work since we are skipping frames to adjust the speed of the snake. But good for regular animations.
 function fpsCounter() {
     var sec = Math.floor(Date.now() / 1000);
     if (sec != curSecond) {
