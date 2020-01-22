@@ -24,3 +24,7 @@ I created this good old classic to play with HTML5 canvas a bit and get some pra
     
     BUG:
         [ ] - Some weirdness when turning. Snake head turns after already moving an additional block forward.
+
+## Demo
+
+<https://iambj.github.io/snake/>
